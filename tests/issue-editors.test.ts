@@ -9,6 +9,7 @@ function toolbar(id: string): string {
 
 afterEach(() => {
   document.body.innerHTML = '';
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -93,6 +94,35 @@ describe('Issue 多编辑器', () => {
     expect(menu.isConnected).toBe(true);
     button.click();
     expect(document.querySelector('[role="menu"]')).toBeNull();
+    stop();
+  });
+
+  it('Alert 二级页变高时仍留在原按钮下方并改用滚动', () => {
+    history.replaceState({}, '', '/owner/repo/issues/new');
+    document.body.innerHTML = `<div role="dialog">${toolbar('body')}</div>`;
+    const anchorBottom = window.innerHeight - 230;
+    const rect = (top: number, left: number, width: number, height: number) => ({
+      top, left, width, height, right: left + width, bottom: top + height,
+    }) as DOMRect;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      if (this.matches('[data-gh-enhance-button]')) return rect(anchorBottom - 30, 500, 30, 30);
+      if (this.matches('.gh-enhance-menu')) {
+        const naturalHeight = this.querySelector('.gh-enhance-menu-header') ? 240 : 170;
+        const maxHeight = Number.parseFloat((this as HTMLElement).style.maxHeight) || naturalHeight;
+        return rect(Number.parseFloat((this as HTMLElement).style.top) || 0,
+          Number.parseFloat((this as HTMLElement).style.left) || 0, 204, Math.min(naturalHeight, maxHeight));
+      }
+      return rect(0, 0, 0, 0);
+    });
+
+    const stop = startEnhancer();
+    document.querySelector<HTMLButtonElement>('[data-gh-enhance-button]')!.click();
+    const menu = document.querySelector<HTMLElement>('.gh-enhance-menu')!;
+    const rootTop = Number.parseFloat(menu.style.top);
+    expect(rootTop).toBeGreaterThan(anchorBottom);
+    document.querySelector<HTMLButtonElement>('[data-gh-category="ALERT"]')!.click();
+    expect(Number.parseFloat(menu.style.top)).toBeGreaterThan(anchorBottom);
+    expect(Number.parseFloat(menu.style.maxHeight)).toBeLessThan(240);
     stop();
   });
 
