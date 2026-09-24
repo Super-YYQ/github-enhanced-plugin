@@ -14,6 +14,6 @@
 
 实页测试通过 Playwright 在已登录测试浏览器页面初始化时注入 `dist/content.js`，没有通过扩展管理页加载 Manifest V3 包。因此这份记录证明页面 DOM 和原生编辑行为，但不证明 Chrome/Edge 扩展的隔离环境装载行为。
 
-仍未验收：Edge 实际 GitHub 页、真实多字段 Issue Form、已有 Issue 描述和评论、Markdown 文件编辑/新建的其他页面变体、长文件视口外内容、中文输入法及高对比视觉模式。当前文件编辑器以可见 CodeMirror DOM 判断快照是否变化；视口外内容若在菜单打开期间变化，可能无法识别过期快照，这一点尚未达到 Spec 的长文件要求。当前仓库远端没有提交或已存在的 README/Issue；获授权的 `codex-Monitor` 仓库没有多字段 Issue Form，也没有现成 Issue。Edge 独立测试浏览器停在 GitHub 登录页，尚无登录态。上述场景完成前，不应将本版标记为符合 Spec 的全部验收条件。真实持久化提交也未执行。
+仍未验收：Edge 实际 GitHub 页、真实多字段 Issue Form、已有 Issue 描述和评论、Markdown 文件编辑/新建的其他页面变体、长文件视口外内容、中文输入法及高对比视觉模式。当前文件编辑器以可见 CodeMirror DOM 判断快照是否变化；视口外内容若在菜单打开期间变化，可能无法识别过期快照，这一点尚未达到 Spec 的长文件要求。只读检查现有 README 编辑页未发现承载完整正文的 `textarea` 或隐藏输入框，不能据此消除该风险。当前仓库远端没有提交或已存在的 README/Issue；获授权的 `codex-Monitor` 仓库没有多字段 Issue Form，也没有现成 Issue。Edge 独立测试浏览器停在 GitHub 登录页，用户选择跳过 Edge 实页验收；该窗口已关闭。上述场景完成前，不应将本版标记为符合 Spec 的全部验收条件。真实持久化提交也未执行。
 
 本地代码检查：`npm run typecheck`、`npm test`（3 个测试文件、19 个测试）及 `npm run build` 均通过。
