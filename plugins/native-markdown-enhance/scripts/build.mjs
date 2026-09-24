@@ -24,5 +24,5 @@ await Promise.all([
   copyFile('src/options.css', resolve(output, 'options.css')),
 ]);
 await mkdir(resolve(output, 'icons'), { recursive: true });
-await Promise.all([16, 32, 48].map((size) =>
+await Promise.all([16, 32, 48, 128].map((size) =>
   copyFile(`assets/icon${size}.png`, resolve(output, `icons/icon${size}.png`))));

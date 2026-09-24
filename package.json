@@ -1,21 +1,12 @@
 {
   "name": "github-enhanced-plugin",
-  "version": "0.2.0",
   "private": true,
-  "type": "module",
+  "license": "MIT",
+  "workspaces": ["plugins/*"],
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "fixture": "node scripts/fixture-server.mjs",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
-  },
-  "devDependencies": {
-    "@codemirror/commands": "^6.11.1",
-    "@codemirror/state": "^6.7.6",
-    "@codemirror/view": "^6.43.13",
-    "esbuild": "^0.28.2",
-    "jsdom": "^27.0.0",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.1"
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "fixture": "npm run fixture --workspace github-native-markdown-enhance"
   }
 }

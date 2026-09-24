@@ -13,7 +13,7 @@ def scaled(point, factor):
     return tuple(round(part * factor) for part in point)
 
 
-for size in (16, 32, 48):
+for size in (16, 32, 48, 128):
     factor = size * 8 / 48
     dimension = size * 8
     image = Image.new("RGBA", (dimension, dimension), (0, 0, 0, 0))

@@ -1,0 +1,22 @@
+{
+  "name": "github-native-markdown-enhance",
+  "version": "0.2.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "fixture": "node scripts/fixture-server.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.13",
+    "esbuild": "^0.28.2",
+    "jsdom": "^27.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}
