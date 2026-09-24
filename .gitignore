@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.npm-cache/
+.browser-state/
+.fixture-build/
+.playwright/
+.playwright-cli/
+output/playwright/
+.planning/
+LocalLow/
