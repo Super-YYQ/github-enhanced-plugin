@@ -1,4 +1,11 @@
 import { Command, CommandUnavailable, createInsertion } from './commands';
+import { renderTemplate } from './templates';
+
+export type InsertionCommand = Command | { template: string };
+
+function insertionFor(command: InsertionCommand, context: { before: string; selected: string; after: string }) {
+  return typeof command === 'string' ? createInsertion(command, context) : renderTemplate(command.template, context.selected);
+}
 
 export interface TextareaSnapshot {
   kind: 'textarea';
@@ -26,7 +33,7 @@ export interface EditorAdapter {
   readonly element: Element;
   isWritable(): boolean;
   capture(): EditorSnapshot | null;
-  insert(command: Command, snapshot: EditorSnapshot): void;
+  insert(command: InsertionCommand, snapshot: EditorSnapshot): void;
 }
 
 export class TextareaEditor implements EditorAdapter {
@@ -50,7 +57,7 @@ export class TextareaEditor implements EditorAdapter {
     };
   }
 
-  insert(command: Command, snapshot: EditorSnapshot): void {
+  insert(command: InsertionCommand, snapshot: EditorSnapshot): void {
     if (snapshot.kind !== 'textarea' || !this.isWritable() || snapshot.source !== this.field || snapshot.url !== location.href || snapshot.text !== this.field.value) {
       throw new CommandUnavailable('编辑器内容已变化，请重新选择');
     }
@@ -58,7 +65,7 @@ export class TextareaEditor implements EditorAdapter {
       throw new CommandUnavailable('选区已变化，请重新选择');
     }
 
-    const insertion = createInsertion(command, {
+    const insertion = insertionFor(command, {
       before: snapshot.text.slice(0, snapshot.from),
       selected: snapshot.text.slice(snapshot.from, snapshot.to),
       after: snapshot.text.slice(snapshot.to),
@@ -100,7 +107,6 @@ function linePart(content: HTMLElement, range: Range, side: 'before' | 'after'):
 }
 
 function selectInsertedText(content: HTMLElement, insertion: { insert: string; selection: { from: number; to: number } }): void {
-  if (insertion.selection.from === insertion.selection.to) return;
   const selection = window.getSelection();
   if (!selection || selection.rangeCount !== 1) return;
   const caret = selection.getRangeAt(0);
@@ -172,13 +178,13 @@ export class FileEditor implements EditorAdapter {
     };
   }
 
-  insert(command: Command, snapshot: EditorSnapshot): void {
+  insert(command: InsertionCommand, snapshot: EditorSnapshot): void {
     if (snapshot.kind !== 'file' || snapshot.source !== this.content || snapshot.url !== location.href ||
       snapshot.html !== this.content.innerHTML || !this.isWritable() ||
       !this.content.contains(snapshot.range.startContainer) || !this.content.contains(snapshot.range.endContainer)) {
       throw new CommandUnavailable('编辑器内容已变化，请重新选择');
     }
-    const insertion = createInsertion(command, {
+    const insertion = insertionFor(command, {
       before: snapshot.before,
       selected: snapshot.selected,
       after: snapshot.after,

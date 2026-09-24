@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { startEnhancer } from '../src/mount';
+import { DEFAULT_SETTINGS } from '../src/settings';
 
 function toolbar(id: string): string {
   return `<markdown-toolbar for="${id}"><button type="button">Bold</button></markdown-toolbar><textarea id="${id}"></textarea>`;
@@ -29,6 +30,7 @@ describe('Issue 多编辑器', () => {
     expect(document.querySelectorAll('[data-gh-enhance-button]')).toHaveLength(3);
     expect(document.querySelector('markdown-toolbar[for="code"]')).toBeNull();
     (document.querySelector('[for="solution"] [data-gh-enhance-button]') as HTMLButtonElement).click();
+    (document.querySelector('[data-gh-category="ALERT"]') as HTMLButtonElement).click();
     (document.querySelector('[data-gh-command="NOTE"]') as HTMLButtonElement).click();
     expect((document.querySelector('#solution') as HTMLTextAreaElement).value).toBe('> [!NOTE]\n> 在这里输入内容');
     expect((document.querySelector('#problem') as HTMLTextAreaElement).value).toBe('');
@@ -91,6 +93,51 @@ describe('Issue 多编辑器', () => {
     expect(menu.isConnected).toBe(true);
     button.click();
     expect(document.querySelector('[role="menu"]')).toBeNull();
+    stop();
+  });
+
+  it('Alert 页可用键盘返回，设置更新后只显示启用命令', () => {
+    history.replaceState({}, '', '/owner/repo/issues/new');
+    document.body.innerHTML = toolbar('body');
+    const stop = startEnhancer();
+    (document.querySelector('[data-gh-enhance-button]') as HTMLButtonElement).click();
+    const alert = document.querySelector<HTMLButtonElement>('[data-gh-category="ALERT"]')!;
+    alert.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    expect(document.querySelector('[data-gh-command="NOTE"]')).toBeTruthy();
+    document.querySelector('[data-gh-command="NOTE"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
+    expect(document.querySelector('[data-gh-category="ALERT"]')).toBeTruthy();
+    stop.updateSettings({ ...DEFAULT_SETTINGS, hiddenBuiltIns: ['NOTE', 'TIP', 'IMPORTANT', 'WARNING', 'CAUTION', 'DETAILS', 'KEYBOARD', 'DIFF'] });
+    expect(document.querySelector('[data-gh-enhance-button]')).toBeNull();
+    stop();
+  });
+
+  it('自定义模板只替换所属编辑器的选区，并将光标放到标记位置', () => {
+    history.replaceState({}, '', '/owner/repo/issues/new');
+    document.body.innerHTML = toolbar('first') + toolbar('second');
+    const first = document.getElementById('first') as HTMLTextAreaElement;
+    const second = document.getElementById('second') as HTMLTextAreaElement;
+    first.value = '不要修改';
+    second.value = '重要';
+    second.setSelectionRange(0, 2);
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: vi.fn((_name: string, _show: boolean, text: string) => {
+        const field = document.activeElement as HTMLTextAreaElement;
+        field.setRangeText(text, field.selectionStart, field.selectionEnd, 'end');
+        return true;
+      }),
+    });
+    const stop = startEnhancer({
+      ...DEFAULT_SETTINGS,
+      customCommands: [{ id: 'emphasis', name: '强调', icon: 'sparkle', template: '**{{selection}}{{cursor}}**', enabled: true }],
+    });
+    (document.querySelector('[for="second"] [data-gh-enhance-button]') as HTMLButtonElement).click();
+    (document.querySelector('[data-gh-category="CUSTOM"]') as HTMLButtonElement).click();
+    (document.querySelector('[data-gh-custom-command="emphasis"]') as HTMLButtonElement).click();
+    expect(first.value).toBe('不要修改');
+    expect(second.value).toBe('**重要**');
+    expect(second.selectionStart).toBe(4);
+    expect(second.selectionEnd).toBe(4);
     stop();
   });
 });

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Markdown 增强 · 设置</title>
+  <link rel="stylesheet" href="options.css">
+  <script src="options.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div class="hero-top">
+        <div class="brand-mark" aria-hidden="true">✦</div>
+        <span class="eyebrow">GITHUB NATIVE MARKDOWN ENHANCE</span>
+        <span class="version">v0.2</span>
+      </div>
+      <h1>按你的方式写 Markdown。</h1>
+      <p>整理增强菜单、保存常用模板。GitHub 原生编辑器和预览始终由 GitHub 控制。</p>
+    </header>
+
+    <div class="layout">
+      <nav class="side-nav" aria-label="设置导航">
+        <a href="#builtins">内置命令</a>
+        <a href="#custom">自定义命令</a>
+        <a href="#appearance">外观</a>
+        <a href="#backup">备份与恢复</a>
+      </nav>
+
+      <main class="sections">
+        <section class="panel" id="builtins" aria-labelledby="builtins-title">
+          <div class="section-heading">
+            <div><span class="section-kicker">01 / MENU</span><h2 id="builtins-title">内置命令</h2></div>
+            <p>控制显示，并调整两个层级的顺序。内置模板保持固定。</p>
+          </div>
+          <div class="subsection">
+            <div class="subsection-heading"><h3>一级菜单</h3><span>Alert 作为一个入口</span></div>
+            <div id="root-list" class="command-list"></div>
+          </div>
+          <div class="subsection">
+            <div class="subsection-heading"><h3>Alert 类型</h3><span>点击 Alert 后展示</span></div>
+            <div id="alert-list" class="command-list"></div>
+          </div>
+        </section>
+
+        <section class="panel" id="custom" aria-labelledby="custom-title">
+          <div class="section-heading">
+            <div><span class="section-kicker">02 / YOUR TOOLS</span><h2 id="custom-title">自定义命令</h2></div>
+            <p>所有自定义命令收在菜单的「自定义」二级页。</p>
+          </div>
+          <div class="section-actions"><span id="custom-count" class="count"></span><button id="add-command" type="button" class="button primary">＋ 新建命令</button></div>
+          <div id="custom-list" class="command-list"></div>
+          <div id="custom-editor" class="editor-card" hidden>
+            <div class="editor-heading"><h3 id="editor-title">新建命令</h3><button id="cancel-edit" type="button" class="button quiet">取消</button></div>
+            <div class="field-grid">
+              <label class="field"><span>名称 <small id="name-count">0 / 40 字符</small></span><input id="custom-name" type="text" placeholder="例如：强调文字" autocomplete="off"></label>
+              <div class="field"><span>图标</span><div id="icon-picker" class="icon-picker" role="group" aria-label="自定义命令图标"></div></div>
+            </div>
+            <label class="field template-field"><span>Markdown 模板 <small id="template-count">0 / 10240 字节</small></span><textarea id="custom-template" rows="6" spellcheck="false" placeholder="**{{selection}}{{cursor}}**"></textarea></label>
+            <p class="field-help"><code>{{selection}}</code> 插入选中文字；<code>{{cursor}}</code> 标记插入后的光标位置，最多一次。未使用 selection 时，模板直接替换选区。</p>
+            <div id="template-preview" class="preview" aria-live="polite"></div>
+            <div class="editor-footer"><span id="editor-error" class="inline-error" role="alert"></span><button id="save-command" type="button" class="button primary">保存命令</button></div>
+          </div>
+        </section>
+
+        <section class="panel" id="appearance" aria-labelledby="appearance-title">
+          <div class="section-heading">
+            <div><span class="section-kicker">03 / DISPLAY</span><h2 id="appearance-title">外观</h2></div>
+            <p>只调整扩展菜单与此设置页，GitHub 编辑器的字号不变。</p>
+          </div>
+          <div class="font-control">
+            <div><h3>界面字号</h3><p>12–20 px，默认 14 px</p></div>
+            <div class="font-input"><input id="font-size" type="range" min="12" max="20" step="1" aria-label="扩展界面字号"><output id="font-output" for="font-size">14 px</output></div>
+          </div>
+        </section>
+
+        <section class="panel" id="backup" aria-labelledby="backup-title">
+          <div class="section-heading">
+            <div><span class="section-kicker">04 / LOCAL DATA</span><h2 id="backup-title">备份与恢复</h2></div>
+            <p>配置只保存在当前浏览器。导出文件不包含 GitHub 正文或选区。</p>
+          </div>
+          <div class="backup-actions">
+            <button id="export-settings" type="button" class="button">导出 JSON</button>
+            <button id="choose-import" type="button" class="button">导入 JSON</button>
+            <input id="import-file" type="file" accept=".json,application/json" hidden>
+            <button id="reset-settings" type="button" class="button quiet">恢复内置默认</button>
+          </div>
+          <div id="import-preview" class="review-card" hidden></div>
+          <div id="reset-preview" class="review-card" hidden>
+            <h3>恢复内置默认？</h3>
+            <p>内置命令重新显示并恢复顺序，界面字号回到 14 px。你的自定义命令会保留。</p>
+            <div class="review-actions"><button id="confirm-reset" class="button danger" type="button">确认恢复</button><button id="cancel-reset" class="button quiet" type="button">取消</button></div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <footer>只为 GitHub 原生编辑器增加 Markdown 插入操作。</footer>
+  </div>
+  <div id="status" class="status" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

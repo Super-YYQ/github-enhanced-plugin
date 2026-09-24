@@ -2,7 +2,27 @@
   "manifest_version": 3,
   "name": "GitHub Native Markdown Enhance",
   "description": "Insert Markdown into GitHub's native Issue and file editors.",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "permissions": ["storage"],
+  "action": {
+    "default_title": "打开 Markdown 增强设置",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": ["https://github.com/*"],

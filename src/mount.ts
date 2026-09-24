@@ -1,16 +1,8 @@
-import { Command } from './commands';
-import { EditorAdapter, EditorSnapshot, FileEditor, TextareaEditor } from './editor';
-
-const items: { command: Command; label: string; help: string }[] = [
-  { command: 'NOTE', label: 'Note', help: '补充说明' },
-  { command: 'TIP', label: 'Tip', help: '建议与技巧' },
-  { command: 'IMPORTANT', label: 'Important', help: '重要信息' },
-  { command: 'WARNING', label: 'Warning', help: '潜在风险' },
-  { command: 'CAUTION', label: 'Caution', help: '严重风险' },
-  { command: 'DETAILS', label: 'Details', help: '折叠内容' },
-  { command: 'KEYBOARD', label: 'Keyboard', help: '键盘按键' },
-  { command: 'DIFF', label: 'Diff', help: '差异代码块' },
-];
+import type { Command } from './commands';
+import { BUILT_IN_META } from './catalog';
+import { EditorAdapter, EditorSnapshot, FileEditor, InsertionCommand, TextareaEditor } from './editor';
+import { iconSvg, type IconName } from './icons';
+import { DEFAULT_SETTINGS, hasVisibleCommands, type CustomCommand, type Settings, validateSettings } from './settings';
 
 interface Binding {
   mount: Element;
@@ -18,11 +10,16 @@ interface Binding {
   editor: EditorAdapter;
 }
 
-export function startEnhancer(): () => void {
+type MenuPage = 'root' | 'ALERT' | 'CUSTOM';
+export type EnhancerStop = (() => void) & { updateSettings(settings: Settings): void };
+
+export function startEnhancer(initialSettings: Settings = DEFAULT_SETTINGS): EnhancerStop {
   const bindings = new Map<Element, Binding>();
+  let settings = validateSettings(initialSettings);
   let menu: HTMLElement | null = null;
-  let opened: { binding: Binding; snapshot: EditorSnapshot } | null = null;
+  let opened: { binding: Binding; snapshot: EditorSnapshot; page: MenuPage } | null = null;
   let scanScheduled = false;
+  let disposed = false;
 
   function closeMenu(returnFocus = false): void {
     const previous = opened;
@@ -31,6 +28,134 @@ export function startEnhancer(): () => void {
     opened = null;
     previous?.binding.button.setAttribute('aria-expanded', 'false');
     if (returnFocus && previous?.binding.button.isConnected) previous.binding.button.focus({ preventScroll: true });
+  }
+
+  function showError(message: string, anchor?: Element): void {
+    const notice = document.createElement('div');
+    notice.className = 'gh-enhance-notice';
+    notice.setAttribute('role', 'status');
+    notice.textContent = message;
+    ((anchor ?? opened?.binding.button)?.closest('[role="dialog"],dialog') ?? document.body).append(notice);
+    window.setTimeout(() => notice.remove(), 3500);
+  }
+
+  function positionMenu(): void {
+    if (!menu || !opened) return;
+    const popup = menu;
+    const binding = opened.binding;
+    popup.style.visibility = 'hidden';
+    popup.style.top = '0px';
+    popup.style.left = '0px';
+    popup.style.maxHeight = '';
+    const anchor = binding.button.getBoundingClientRect();
+    const origin = popup.getBoundingClientRect();
+    const dialog = binding.button.closest('[role="dialog"],dialog');
+    const region = dialog?.querySelector(':scope > [role="region"]');
+    const bounds = region?.getBoundingClientRect();
+    const topLimit = Math.max(8, bounds?.top ?? 8);
+    const bottomLimit = Math.min(window.innerHeight - 8, bounds?.bottom ?? window.innerHeight - 8);
+    const below = Math.max(0, bottomLimit - anchor.bottom - 4);
+    const above = Math.max(0, anchor.top - topLimit - 4);
+    const openAbove = below < origin.height && above > below;
+    const viewportRoom = Math.max(1, bottomLimit - topLimit);
+    popup.style.maxHeight = `${Math.max(1, Math.min(origin.height, Math.max(80, openAbove ? above : below), viewportRoom))}px`;
+    const height = popup.getBoundingClientRect().height;
+    const width = popup.getBoundingClientRect().width;
+    const top = openAbove ? anchor.top - height - 4 : anchor.bottom + 4;
+    const left = Math.max(8, Math.min(anchor.right - width, window.innerWidth - width - 8));
+    popup.style.top = `${Math.max(topLimit, Math.min(top, bottomLimit - height)) - origin.top}px`;
+    popup.style.left = `${left - origin.left}px`;
+    popup.style.visibility = 'visible';
+  }
+
+  function makeItem(label: string, icon: IconName, help: string, onSelect: () => void): HTMLButtonElement {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'gh-enhance-item';
+    option.setAttribute('role', 'menuitem');
+    option.tabIndex = -1;
+    option.title = help;
+    option.innerHTML = `<span class="gh-enhance-item-icon">${iconSvg(icon)}</span><span class="gh-enhance-item-label"></span>`;
+    option.querySelector('.gh-enhance-item-label')!.textContent = label;
+    option.addEventListener('click', onSelect);
+    return option;
+  }
+
+  function execute(command: InsertionCommand): void {
+    if (!opened) return;
+    const { binding, snapshot } = opened;
+    try {
+      binding.editor.insert(command, snapshot);
+      closeMenu();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : '无法插入', binding.button);
+      closeMenu();
+    }
+  }
+
+  function commandItem(command: Command): HTMLButtonElement {
+    const meta = BUILT_IN_META[command];
+    const option = makeItem(meta.label, meta.icon, meta.help, () => execute(command));
+    option.dataset.ghCommand = command;
+    return option;
+  }
+
+  function categoryItem(label: string, icon: IconName, category: MenuPage): HTMLButtonElement {
+    const option = makeItem(label, icon, `打开${label}命令`, () => renderMenuPage(category));
+    option.dataset.ghCategory = category;
+    option.insertAdjacentHTML('beforeend', `<span class="gh-enhance-chevron">${iconSvg('right', 14)}</span>`);
+    return option;
+  }
+
+  function customItem(command: CustomCommand): HTMLButtonElement {
+    const option = makeItem(command.name, command.icon, command.name, () => execute({ template: command.template }));
+    option.dataset.ghCustomCommand = command.id;
+    return option;
+  }
+
+  function renderMenuPage(page: MenuPage, focusTarget?: string): void {
+    if (!menu || !opened) return;
+    opened.page = page;
+    menu.replaceChildren();
+    menu.setAttribute('aria-label', page === 'root' ? 'Markdown 增强' : page === 'ALERT' ? 'Alert 命令' : '自定义命令');
+    if (page !== 'root') {
+      const header = document.createElement('div');
+      header.className = 'gh-enhance-menu-header';
+      const back = document.createElement('button');
+      back.type = 'button';
+      back.className = 'gh-enhance-back';
+      back.setAttribute('role', 'menuitem');
+      back.setAttribute('aria-label', '返回主菜单');
+      back.tabIndex = -1;
+      back.innerHTML = `${iconSvg('left', 16)}<span>返回</span>`;
+      back.addEventListener('click', () => renderMenuPage('root', page));
+      const title = document.createElement('span');
+      title.textContent = page === 'ALERT' ? 'Alert' : '自定义';
+      header.append(back, title);
+      menu.append(header);
+    }
+
+    if (page === 'root') {
+      for (const item of settings.rootOrder) {
+        if (item === 'ALERT') {
+          if (settings.alertOrder.some((command) => !settings.hiddenBuiltIns.includes(command))) {
+            menu.append(categoryItem('Alert', 'alert', 'ALERT'));
+          }
+        } else if (!settings.hiddenBuiltIns.includes(item as Command)) menu.append(commandItem(item as Command));
+      }
+      if (settings.customCommands.some((command) => command.enabled)) menu.append(categoryItem('自定义', 'sparkle', 'CUSTOM'));
+    } else if (page === 'ALERT') {
+      for (const command of settings.alertOrder) {
+        if (!settings.hiddenBuiltIns.includes(command)) menu.append(commandItem(command));
+      }
+    } else {
+      for (const command of settings.customCommands) {
+        if (command.enabled) menu.append(customItem(command));
+      }
+    }
+    positionMenu();
+    const target = focusTarget ? menu.querySelector<HTMLButtonElement>(`[data-gh-category="${focusTarget}"]`) : null;
+    (target ?? menu.querySelector<HTMLButtonElement>('[role="menuitem"]'))?.focus({ preventScroll: true });
   }
 
   function openMenu(binding: Binding): void {
@@ -44,44 +169,31 @@ export function startEnhancer(): () => void {
       showError('请先在编辑器中放置光标', binding.button);
       return;
     }
-    opened = { binding, snapshot };
     const popup = document.createElement('div');
     popup.className = 'gh-enhance-menu';
     popup.setAttribute('role', 'menu');
-    popup.setAttribute('aria-label', 'Markdown 增强');
-
-    for (const item of items) {
-      const option = document.createElement('button');
-      option.type = 'button';
-      option.className = 'gh-enhance-item';
-      option.dataset.ghCommand = item.command;
-      option.setAttribute('role', 'menuitem');
-      option.tabIndex = -1;
-      option.textContent = `${item.label} · ${item.help}`;
-      option.addEventListener('click', () => {
-        if (!opened || opened.binding !== binding) return;
-        try {
-          binding.editor.insert(item.command, opened.snapshot);
-          closeMenu();
-        } catch (error) {
-          showError(error instanceof Error ? error.message : '无法插入');
-          closeMenu();
-        }
-      });
-      popup.append(option);
-    }
+    popup.style.fontSize = `${settings.fontSize}px`;
     popup.addEventListener('keydown', (event) => {
-      const options = [...popup.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
+      if (!menu || !opened) return;
+      const options = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
       const current = options.indexOf(document.activeElement as HTMLButtonElement);
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' || event.key === 'ArrowLeft' && opened.page !== 'root') {
         event.preventDefault();
-        closeMenu(true);
+        if (opened.page === 'root') closeMenu(true);
+        else renderMenuPage('root', opened.page);
       } else if (event.key === 'Tab') {
         event.preventDefault();
+        const owner = opened.binding;
         closeMenu();
-        if (event.shiftKey) binding.button.focus({ preventScroll: true });
-        else if (binding.editor instanceof TextareaEditor) binding.editor.field.focus({ preventScroll: true });
-        else if (binding.editor instanceof FileEditor) binding.editor.content.focus({ preventScroll: true });
+        if (event.shiftKey) owner.button.focus({ preventScroll: true });
+        else if (owner.editor instanceof TextareaEditor) owner.editor.field.focus({ preventScroll: true });
+        else if (owner.editor instanceof FileEditor) owner.editor.content.focus({ preventScroll: true });
+      } else if (event.key === 'ArrowRight' || event.key === 'Enter' || event.key === ' ') {
+        const item = options[current];
+        if (item && (event.key !== 'ArrowRight' || item.dataset.ghCategory)) {
+          event.preventDefault();
+          item.click();
+        }
       } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
         event.preventDefault();
         const next = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1
@@ -89,48 +201,20 @@ export function startEnhancer(): () => void {
         const option = options[next];
         option?.focus({ preventScroll: true });
         if (option) {
-          const top = option.getBoundingClientRect().top - popup.getBoundingClientRect().top + popup.scrollTop;
-          if (top < popup.scrollTop) popup.scrollTop = top;
-          else if (top + option.offsetHeight > popup.scrollTop + popup.clientHeight) {
-            popup.scrollTop = top + option.offsetHeight - popup.clientHeight;
+          const top = option.getBoundingClientRect().top - menu.getBoundingClientRect().top + menu.scrollTop;
+          if (top < menu.scrollTop) menu.scrollTop = top;
+          else if (top + option.offsetHeight > menu.scrollTop + menu.clientHeight) {
+            menu.scrollTop = top + option.offsetHeight - menu.clientHeight;
           }
         }
       }
     });
+    opened = { binding, snapshot, page: 'root' };
     menu = popup;
-    // GitHub Issue Forms can live in a modal. A body-level popup sits behind
-    // its backdrop and escapes the modal focus trap.
     const dialog = binding.button.closest('[role="dialog"],dialog');
     (dialog ?? document.body).append(popup);
-    popup.style.top = '0px';
-    popup.style.left = '0px';
-    const anchor = binding.button.getBoundingClientRect();
-    const origin = popup.getBoundingClientRect();
-    const region = dialog?.querySelector(':scope > [role="region"]');
-    const bounds = region?.getBoundingClientRect();
-    const topLimit = Math.max(8, bounds?.top ?? 8);
-    const bottomLimit = Math.min(window.innerHeight - 8, bounds?.bottom ?? window.innerHeight - 8);
-    const below = bottomLimit - anchor.bottom - 4;
-    const above = anchor.top - topLimit - 4;
-    const openAbove = below < origin.height && above > below;
-    popup.style.maxHeight = `${Math.max(80, Math.min(origin.height, openAbove ? above : below))}px`;
-    const height = popup.getBoundingClientRect().height;
-    const width = origin.width;
-    const top = openAbove ? anchor.top - height - 4 : anchor.bottom + 4;
-    const left = Math.max(8, Math.min(anchor.right - width, window.innerWidth - width - 8));
-    popup.style.top = `${Math.max(topLimit, Math.min(top, bottomLimit - height)) - origin.top}px`;
-    popup.style.left = `${left - origin.left}px`;
     binding.button.setAttribute('aria-expanded', 'true');
-    popup.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
-  }
-
-  function showError(message: string, anchor?: Element): void {
-    const notice = document.createElement('div');
-    notice.className = 'gh-enhance-notice';
-    notice.setAttribute('role', 'status');
-    notice.textContent = message;
-    ((anchor ?? opened?.binding.button)?.closest('[role="dialog"],dialog') ?? document.body).append(notice);
-    window.setTimeout(() => notice.remove(), 3500);
+    renderMenuPage('root');
   }
 
   function createButton(onClick: () => void): HTMLButtonElement {
@@ -141,7 +225,7 @@ export function startEnhancer(): () => void {
     const label = document.documentElement.lang.toLowerCase().startsWith('en') ? 'Markdown enhancements' : 'Markdown 增强';
     button.setAttribute('aria-label', label);
     button.title = label;
-    button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 7-7M9.5 4.5l2 2M3 2v3M1.5 3.5h3M12 10v3M10.5 11.5h3"/></svg><svg aria-hidden="true" viewBox="0 0 8 8" width="8" height="8" fill="currentColor"><path d="m1 2.5 3 3 3-3z"/></svg>';
+    button.innerHTML = `${iconSvg('sparkle')}${iconSvg('down', 8)}`;
     button.setAttribute('aria-haspopup', 'menu');
     button.setAttribute('aria-expanded', 'false');
     button.addEventListener('click', onClick);
@@ -166,27 +250,27 @@ export function startEnhancer(): () => void {
     const filename = document.querySelector<HTMLInputElement>('input[aria-label="File name"]');
     if (filename) return /\.(?:md|markdown)$/i.test(filename.value);
     if (/\/edit\//.test(location.pathname)) {
-      try {
-        return /\.(?:md|markdown)$/i.test(decodeURIComponent(location.pathname));
-      } catch {
-        return false;
-      }
+      try { return /\.(?:md|markdown)$/i.test(decodeURIComponent(location.pathname)); }
+      catch { return false; }
     }
     return false;
   }
 
   function scan(): void {
     scanScheduled = false;
+    if (disposed) return;
+    const enabled = hasVisibleCommands(settings);
     for (const [mount, binding] of bindings) {
       const issueEditor = binding.editor instanceof TextareaEditor ? binding.editor : null;
       const relevant = issueEditor ? issuePage() && mount.getAttribute('for') === issueEditor.field.id : markdownFilePage();
-      if (!relevant || !mount.isConnected || !binding.editor.isWritable() || !binding.button.isConnected) {
+      if (!enabled || !relevant || !mount.isConnected || !binding.editor.isWritable() || !binding.button.isConnected) {
         if (opened?.binding === binding) closeMenu();
         if (issueEditor) binding.button.remove();
         else binding.button.parentElement?.remove();
         bindings.delete(mount);
       }
     }
+    if (!enabled) return;
     if (issuePage()) for (const toolbar of document.querySelectorAll('markdown-toolbar[for]')) {
       if (bindings.has(toolbar)) continue;
       const id = toolbar.getAttribute('for');
@@ -222,7 +306,7 @@ export function startEnhancer(): () => void {
   }
 
   function scheduleScan(): void {
-    if (scanScheduled) return;
+    if (scanScheduled || disposed) return;
     scanScheduled = true;
     queueMicrotask(scan);
   }
@@ -256,7 +340,9 @@ export function startEnhancer(): () => void {
   window.addEventListener('resize', onScrollOrResize);
   window.addEventListener('popstate', scheduleScan);
   scan();
-  return () => {
+
+  const stop = (() => {
+    disposed = true;
     observer.disconnect();
     document.removeEventListener('click', onOutsideClick, true);
     document.removeEventListener('focusin', onFocus, true);
@@ -270,5 +356,11 @@ export function startEnhancer(): () => void {
       else binding.button.remove();
     }
     bindings.clear();
+  }) as EnhancerStop;
+  stop.updateSettings = (next: Settings) => {
+    settings = validateSettings(next);
+    closeMenu();
+    scan();
   };
+  return stop;
 }
