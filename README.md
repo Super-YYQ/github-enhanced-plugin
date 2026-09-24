@@ -17,7 +17,7 @@ npm run build
 
 ## 使用
 
-在 GitHub Issue 的 Markdown 正文框或 Markdown 文件编辑器中放置光标或选择文字，点击对应的 **增强 ▾**，再选择命令。菜单支持方向键、Home/End、Enter 和 Escape；插入后可以继续使用 GitHub 原有的 Write / Preview、编辑和撤销。多输入框页面中的按钮只作用于各自的输入框。
+在 GitHub Issue 的 Markdown 正文框或 Markdown 文件编辑器中放置光标或选择文字，点击工具栏中的魔杖图标及下拉箭头（悬停提示为 **Markdown enhancements** 或 **Markdown 增强**），再选择命令。菜单支持方向键、Home/End、Enter 和 Escape；插入后可以继续使用 GitHub 原有的 Write / Preview、编辑和撤销。多输入框页面中的按钮只作用于各自的输入框。
 
 扩展目前仅针对 `github.com` 的 Issue 和 `.md` / `.markdown` 文件编辑路径；PR、Discussion、Wiki、github.dev 与 GitHub Enterprise 未做适配。GitHub 页面结构可能变化，若入口未出现或提示编辑器已变化，请保留原草稿并查看[验收记录](.scratch/native-markdown-enhancement/acceptance.md)。
 

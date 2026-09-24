@@ -30,14 +30,18 @@ export function startEnhancer(): () => void {
     menu = null;
     opened = null;
     previous?.binding.button.setAttribute('aria-expanded', 'false');
-    if (returnFocus && previous?.binding.button.isConnected) previous.binding.button.focus();
+    if (returnFocus && previous?.binding.button.isConnected) previous.binding.button.focus({ preventScroll: true });
   }
 
   function openMenu(binding: Binding): void {
+    if (opened?.binding === binding) {
+      closeMenu(true);
+      return;
+    }
     closeMenu();
     const snapshot = binding.editor.capture();
     if (!snapshot) {
-      showError('请先在编辑器中放置光标');
+      showError('请先在编辑器中放置光标', binding.button);
       return;
     }
     opened = { binding, snapshot };
@@ -45,10 +49,6 @@ export function startEnhancer(): () => void {
     popup.className = 'gh-enhance-menu';
     popup.setAttribute('role', 'menu');
     popup.setAttribute('aria-label', 'Markdown 增强');
-    const rect = binding.button.getBoundingClientRect();
-    const below = window.innerHeight - rect.bottom;
-    popup.style.top = `${below < 260 && rect.top > below ? Math.max(8, rect.top - 360) : rect.bottom + 4}px`;
-    popup.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - 230))}px`;
 
     for (const item of items) {
       const option = document.createElement('button');
@@ -79,28 +79,57 @@ export function startEnhancer(): () => void {
       } else if (event.key === 'Tab') {
         event.preventDefault();
         closeMenu();
-        if (event.shiftKey) binding.button.focus();
-        else if (binding.editor instanceof TextareaEditor) binding.editor.field.focus();
-        else if (binding.editor instanceof FileEditor) binding.editor.content.focus();
+        if (event.shiftKey) binding.button.focus({ preventScroll: true });
+        else if (binding.editor instanceof TextareaEditor) binding.editor.field.focus({ preventScroll: true });
+        else if (binding.editor instanceof FileEditor) binding.editor.content.focus({ preventScroll: true });
       } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
         event.preventDefault();
         const next = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1
           : event.key === 'ArrowDown' ? (current + 1) % options.length : (current - 1 + options.length) % options.length;
-        options[next]?.focus();
+        const option = options[next];
+        option?.focus({ preventScroll: true });
+        if (option) {
+          const top = option.getBoundingClientRect().top - popup.getBoundingClientRect().top + popup.scrollTop;
+          if (top < popup.scrollTop) popup.scrollTop = top;
+          else if (top + option.offsetHeight > popup.scrollTop + popup.clientHeight) {
+            popup.scrollTop = top + option.offsetHeight - popup.clientHeight;
+          }
+        }
       }
     });
     menu = popup;
-    document.body.append(popup);
+    // GitHub Issue Forms can live in a modal. A body-level popup sits behind
+    // its backdrop and escapes the modal focus trap.
+    const dialog = binding.button.closest('[role="dialog"],dialog');
+    (dialog ?? document.body).append(popup);
+    popup.style.top = '0px';
+    popup.style.left = '0px';
+    const anchor = binding.button.getBoundingClientRect();
+    const origin = popup.getBoundingClientRect();
+    const region = dialog?.querySelector(':scope > [role="region"]');
+    const bounds = region?.getBoundingClientRect();
+    const topLimit = Math.max(8, bounds?.top ?? 8);
+    const bottomLimit = Math.min(window.innerHeight - 8, bounds?.bottom ?? window.innerHeight - 8);
+    const below = bottomLimit - anchor.bottom - 4;
+    const above = anchor.top - topLimit - 4;
+    const openAbove = below < origin.height && above > below;
+    popup.style.maxHeight = `${Math.max(80, Math.min(origin.height, openAbove ? above : below))}px`;
+    const height = popup.getBoundingClientRect().height;
+    const width = origin.width;
+    const top = openAbove ? anchor.top - height - 4 : anchor.bottom + 4;
+    const left = Math.max(8, Math.min(anchor.right - width, window.innerWidth - width - 8));
+    popup.style.top = `${Math.max(topLimit, Math.min(top, bottomLimit - height)) - origin.top}px`;
+    popup.style.left = `${left - origin.left}px`;
     binding.button.setAttribute('aria-expanded', 'true');
-    popup.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    popup.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
   }
 
-  function showError(message: string): void {
+  function showError(message: string, anchor?: Element): void {
     const notice = document.createElement('div');
     notice.className = 'gh-enhance-notice';
     notice.setAttribute('role', 'status');
     notice.textContent = message;
-    document.body.append(notice);
+    ((anchor ?? opened?.binding.button)?.closest('[role="dialog"],dialog') ?? document.body).append(notice);
     window.setTimeout(() => notice.remove(), 3500);
   }
 
@@ -109,7 +138,10 @@ export function startEnhancer(): () => void {
     button.type = 'button';
     button.className = 'gh-enhance-button';
     button.dataset.ghEnhanceButton = '';
-    button.textContent = document.documentElement.lang.toLowerCase().startsWith('en') ? 'Enhance ▾' : '增强 ▾';
+    const label = document.documentElement.lang.toLowerCase().startsWith('en') ? 'Markdown enhancements' : 'Markdown 增强';
+    button.setAttribute('aria-label', label);
+    button.title = label;
+    button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 7-7M9.5 4.5l2 2M3 2v3M1.5 3.5h3M12 10v3M10.5 11.5h3"/></svg><svg aria-hidden="true" viewBox="0 0 8 8" width="8" height="8" fill="currentColor"><path d="m1 2.5 3 3 3-3z"/></svg>';
     button.setAttribute('aria-haspopup', 'menu');
     button.setAttribute('aria-expanded', 'false');
     button.addEventListener('click', onClick);
@@ -211,11 +243,17 @@ export function startEnhancer(): () => void {
     if (event.target instanceof HTMLInputElement && event.target.matches('input[aria-label="File name"]')) scheduleScan();
   }
 
+  function onScrollOrResize(event: Event): void {
+    if (menu && !(event.type === 'scroll' && event.target instanceof Node && menu.contains(event.target))) closeMenu();
+  }
+
   const observer = new MutationObserver(scheduleScan);
   observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['for', 'disabled', 'readonly'] });
   document.addEventListener('click', onOutsideClick, true);
   document.addEventListener('focusin', onFocus, true);
   document.addEventListener('input', onInput, true);
+  document.addEventListener('scroll', onScrollOrResize, true);
+  window.addEventListener('resize', onScrollOrResize);
   window.addEventListener('popstate', scheduleScan);
   scan();
   return () => {
@@ -223,6 +261,8 @@ export function startEnhancer(): () => void {
     document.removeEventListener('click', onOutsideClick, true);
     document.removeEventListener('focusin', onFocus, true);
     document.removeEventListener('input', onInput, true);
+    document.removeEventListener('scroll', onScrollOrResize, true);
+    window.removeEventListener('resize', onScrollOrResize);
     window.removeEventListener('popstate', scheduleScan);
     closeMenu();
     for (const binding of bindings.values()) {

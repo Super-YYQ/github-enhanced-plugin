@@ -74,4 +74,23 @@ describe('Issue 多编辑器', () => {
     expect(document.activeElement).toBe(document.getElementById('body'));
     stop();
   });
+
+  it('弹窗里的菜单留在弹窗内，入口为可访问的图标按钮', () => {
+    history.replaceState({}, '', '/owner/repo/issues/new');
+    document.body.innerHTML = `<div role="dialog">${toolbar('body')}</div>`;
+    const stop = startEnhancer();
+    const button = document.querySelector<HTMLButtonElement>('[data-gh-enhance-button]')!;
+    expect(button.textContent).toBe('');
+    expect(button.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+    expect(button.getAttribute('aria-label')).toBeTruthy();
+    button.click();
+    const menu = document.querySelector('[role="dialog"] > [role="menu"]')!;
+    expect(menu).toBeTruthy();
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    menu.dispatchEvent(new Event('scroll'));
+    expect(menu.isConnected).toBe(true);
+    button.click();
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    stop();
+  });
 });

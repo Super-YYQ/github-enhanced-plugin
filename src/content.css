@@ -1,13 +1,27 @@
 .gh-enhance-button {
   appearance: none;
-  color: var(--fgColor-default, #24292f);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  box-sizing: border-box;
+  width: 36px;
+  height: 32px;
+  flex: 0 0 36px;
+  color: var(--fgColor-muted, #59636e);
   background: transparent;
-  border: 1px solid var(--borderColor-default, #d0d7de);
+  border: 1px solid transparent;
   border-radius: 6px;
   cursor: pointer;
-  font: inherit;
-  margin-inline-start: 8px;
-  padding: 4px 8px;
+  margin: 0;
+  padding: 0;
+  vertical-align: middle;
+}
+
+.gh-enhance-button svg {
+  display: block;
+  flex: none;
+  pointer-events: none;
 }
 
 .gh-enhance-filebar {
@@ -17,8 +31,14 @@
 }
 
 .gh-enhance-button:hover,
+.gh-enhance-button[aria-expanded="true"] {
+  background: var(--control-transparent-bgColor-hover, #eaeef2);
+  color: var(--fgColor-default, #1f2328);
+}
+
 .gh-enhance-button:focus-visible {
-  background: var(--button-default-bgColor-hover, #f3f4f6);
+  outline: 2px solid var(--focus-outlineColor, #0969da);
+  outline-offset: -2px;
 }
 
 .gh-enhance-menu {
@@ -31,7 +51,7 @@
   padding: 4px;
   border: 1px solid var(--borderColor-default, #d0d7de);
   border-radius: 8px;
-  background: var(--bgColor-default, #fff);
+  background: var(--overlay-bgColor, var(--bgColor-default, #fff));
   color: var(--fgColor-default, #24292f);
   box-shadow: 0 8px 20px rgb(0 0 0 / 18%);
 }
@@ -53,7 +73,7 @@
 .gh-enhance-item:hover,
 .gh-enhance-item:focus-visible {
   background: var(--bgColor-neutral-muted, #eaeef2);
-  outline: 2px solid var(--focus-outlineColor, #0969da);
+  outline: none;
 }
 
 .gh-enhance-notice {
