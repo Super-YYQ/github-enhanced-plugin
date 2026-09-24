@@ -104,8 +104,10 @@ describe('Issue 多编辑器', () => {
     const alert = document.querySelector<HTMLButtonElement>('[data-gh-category="ALERT"]')!;
     alert.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
     expect(document.querySelector('[data-gh-command="NOTE"]')).toBeTruthy();
+    expect(document.activeElement?.getAttribute('data-gh-command')).toBe('NOTE');
     document.querySelector('[data-gh-command="NOTE"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
     expect(document.querySelector('[data-gh-category="ALERT"]')).toBeTruthy();
+    expect(document.activeElement?.getAttribute('data-gh-category')).toBe('ALERT');
     stop.updateSettings({ ...DEFAULT_SETTINGS, hiddenBuiltIns: ['NOTE', 'TIP', 'IMPORTANT', 'WARNING', 'CAUTION', 'DETAILS', 'KEYBOARD', 'DIFF'] });
     expect(document.querySelector('[data-gh-enhance-button]')).toBeNull();
     stop();

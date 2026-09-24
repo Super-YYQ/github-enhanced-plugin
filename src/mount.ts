@@ -155,7 +155,10 @@ export function startEnhancer(initialSettings: Settings = DEFAULT_SETTINGS): Enh
     }
     positionMenu();
     const target = focusTarget ? menu.querySelector<HTMLButtonElement>(`[data-gh-category="${focusTarget}"]`) : null;
-    (target ?? menu.querySelector<HTMLButtonElement>('[role="menuitem"]'))?.focus({ preventScroll: true });
+    const first = page === 'root'
+      ? menu.querySelector<HTMLButtonElement>('[role="menuitem"]')
+      : menu.querySelector<HTMLButtonElement>('.gh-enhance-item');
+    (target ?? first)?.focus({ preventScroll: true });
   }
 
   function openMenu(binding: Binding): void {

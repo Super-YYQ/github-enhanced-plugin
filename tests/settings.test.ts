@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, resetBuiltIns, validateSettings } from '../src/settings';
+import { describe, expect, it, vi } from 'vitest';
+import { DEFAULT_SETTINGS, loadSettings, resetBuiltIns, validateSettings } from '../src/settings';
 
 describe('扩展配置', () => {
   it('合法的本地配置可以往返导入，自定义命令保留图标、模板和顺序', () => {
@@ -25,5 +25,19 @@ describe('扩展配置', () => {
     expect(result.fontSize).toBe(14);
     expect(result.hiddenBuiltIns).toEqual([]);
     expect(result.customCommands).toEqual([custom]);
+  });
+
+  it('本地配置缺失字段时补默认值并保留已有命令，导入仍严格校验', async () => {
+    const custom = { id: 'sample', name: '强调', icon: 'sparkle', template: '**{{selection}}**', enabled: true };
+    const partial = { version: 1, fontSize: 18, customCommands: [custom] };
+    vi.stubGlobal('chrome', { storage: { local: { get: async () => ({ settings: partial }) } } });
+    try {
+      const loaded = await loadSettings();
+      expect(loaded.error).toBeUndefined();
+      expect(loaded.settings).toEqual({ ...DEFAULT_SETTINGS, fontSize: 18, customCommands: [custom] });
+      expect(() => validateSettings(partial)).toThrow(/缺失字段/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

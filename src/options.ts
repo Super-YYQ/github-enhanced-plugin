@@ -2,7 +2,7 @@ import type { Command } from './commands';
 import { BUILT_IN_META } from './catalog';
 import { iconSvg, type IconName } from './icons';
 import {
-  CUSTOM_ICONS, DEFAULT_SETTINGS,
+  ALL_BUILT_INS, CUSTOM_ICONS, DEFAULT_SETTINGS,
   loadSettings, resetBuiltIns, saveSettings, settingsFromChange, validateSettings,
   type CustomCommand, type CustomIcon, type Settings,
 } from './settings';
@@ -129,12 +129,7 @@ function renderBuiltIns(): void {
     const { row, actions } = commandRow(meta.label, meta.help, meta.icon);
     if (item !== 'ALERT') {
       const visible = !settings.hiddenBuiltIns.includes(item as Command);
-      actions.append(toggle(meta.label, visible, (checked) => {
-        const hiddenBuiltIns = checked
-          ? settings.hiddenBuiltIns.filter((command) => command !== item)
-          : [...settings.hiddenBuiltIns, item as Command];
-        void persist({ ...settings, hiddenBuiltIns });
-      }));
+      actions.append(toggle(meta.label, visible, (checked) => setBuiltInVisibility(item as Command, checked)));
     }
     actions.append(
       iconButton('up', `${meta.label} 上移`, () => void persist({ ...settings, rootOrder: swap(settings.rootOrder, index, -1) }), index === 0),
@@ -146,17 +141,19 @@ function renderBuiltIns(): void {
     const meta = BUILT_IN_META[command];
     const { row, actions } = commandRow(meta.label, meta.help, meta.icon);
     actions.append(
-      toggle(meta.label, !settings.hiddenBuiltIns.includes(command), (checked) => {
-        const hiddenBuiltIns = checked
-          ? settings.hiddenBuiltIns.filter((item) => item !== command)
-          : [...settings.hiddenBuiltIns, command];
-        void persist({ ...settings, hiddenBuiltIns });
-      }),
+      toggle(meta.label, !settings.hiddenBuiltIns.includes(command), (checked) => setBuiltInVisibility(command, checked)),
       iconButton('up', `${meta.label} 上移`, () => void persist({ ...settings, alertOrder: swap(settings.alertOrder, index, -1) }), index === 0),
       iconButton('down', `${meta.label} 下移`, () => void persist({ ...settings, alertOrder: swap(settings.alertOrder, index, 1) }), index === settings.alertOrder.length - 1),
     );
     alertList.append(row);
   });
+}
+
+function setBuiltInVisibility(command: Command, visible: boolean): void {
+  const hiddenBuiltIns = visible
+    ? settings.hiddenBuiltIns.filter((item) => item !== command)
+    : [...settings.hiddenBuiltIns, command];
+  void persist({ ...settings, hiddenBuiltIns });
 }
 
 function renderCustom(): void {
@@ -321,12 +318,29 @@ function renderImportPreview(): void {
   title.textContent = '导入前确认';
   const summary = document.createElement('p');
   summary.textContent = '导入会整体替换当前配置。建议先导出当前配置备份。';
-  const removed = settings.customCommands.filter((item) => !pendingImport!.customCommands.some((incoming) => incoming.id === item.id)).length;
+  const removed = settings.customCommands.filter((item) => !pendingImport!.customCommands.some((incoming) => incoming.id === item.id));
+  const existing = new Map(settings.customCommands.map((item) => [item.id, item]));
+  const added = pendingImport.customCommands.filter((item) => !existing.has(item.id));
+  const modified = pendingImport.customCommands.filter((item) => {
+    const before = existing.get(item.id);
+    return before && (before.name !== item.name || before.icon !== item.icon || before.template !== item.template || before.enabled !== item.enabled);
+  });
+  const sharedBefore = settings.customCommands.filter((item) => pendingImport!.customCommands.some((incoming) => incoming.id === item.id)).map((item) => item.id);
+  const sharedAfter = pendingImport.customCommands.filter((item) => existing.has(item.id)).map((item) => item.id);
+  const reordered = sharedBefore.join('\u0000') !== sharedAfter.join('\u0000');
+  const rootLabels = (order: Settings['rootOrder']) => order.map((item) => item === 'ALERT' ? 'Alert' : BUILT_IN_META[item].label).join(' · ');
+  const alertLabels = (order: Settings['alertOrder']) => order.map((item) => BUILT_IN_META[item].label).join(' · ');
+  const hiddenLabels = (commands: Settings['hiddenBuiltIns']) => commands.length
+    ? ALL_BUILT_INS.filter((item) => commands.includes(item)).map((item) => BUILT_IN_META[item].label).join(' · ') : '无';
+  const difference = (before: string, after: string) => before === after ? '无变化' : `${before} → ${after}`;
   const items = [
     `界面字号：${settings.fontSize} → ${pendingImport.fontSize} px`,
     `自定义命令：${settings.customCommands.length} → ${pendingImport.customCommands.length} 条`,
-    `现有自定义命令将消失：${removed} 条`,
-    '内置命令的显示状态及顺序也将替换',
+    `新增 ${added.length} 条 · 修改 ${modified.length} 条 · 共同命令排序${reordered ? '将调整' : '不变'}`,
+    `现有自定义命令将消失：${removed.length} 条${removed.length ? `（${removed.slice(0, 5).map((item) => item.name).join('、')}${removed.length > 5 ? '…' : ''}）` : ''}`,
+    `一级顺序：${difference(rootLabels(settings.rootOrder), rootLabels(pendingImport.rootOrder))}`,
+    `Alert 顺序：${difference(alertLabels(settings.alertOrder), alertLabels(pendingImport.alertOrder))}`,
+    `隐藏的内置命令：${difference(hiddenLabels(settings.hiddenBuiltIns), hiddenLabels(pendingImport.hiddenBuiltIns))}`,
   ];
   const list = document.createElement('ul');
   for (const item of items) { const li = document.createElement('li'); li.textContent = item; list.append(li); }
@@ -338,9 +352,10 @@ function renderImportPreview(): void {
   confirm.textContent = '确认替换';
   confirm.addEventListener('click', async () => {
     if (!pendingImport) return;
-    await persist(pendingImport, '配置已导入');
-    pendingImport = null;
-    renderImportPreview();
+    if (await persist(pendingImport, '配置已导入')) {
+      pendingImport = null;
+      renderImportPreview();
+    }
   });
   const cancel = document.createElement('button');
   cancel.type = 'button';

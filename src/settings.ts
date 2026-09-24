@@ -94,6 +94,11 @@ export function validateSettings(input: unknown): Settings {
   };
 }
 
+function validateStoredSettings(input: unknown): Settings {
+  const value = record(input, '配置');
+  return validateSettings({ ...DEFAULT_SETTINGS, ...value });
+}
+
 export function resetBuiltIns(settings: Settings): Settings {
   return {
     ...settings,
@@ -113,7 +118,7 @@ export function hasVisibleCommands(settings: Settings): boolean {
 export async function loadSettings(): Promise<{ settings: Settings; error?: string }> {
   try {
     const stored = (await chrome.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
-    return { settings: stored === undefined ? validateSettings(DEFAULT_SETTINGS) : validateSettings(stored) };
+    return { settings: stored === undefined ? validateSettings(DEFAULT_SETTINGS) : validateStoredSettings(stored) };
   } catch (error) {
     return { settings: validateSettings(DEFAULT_SETTINGS), error: error instanceof Error ? error.message : '无法读取配置' };
   }
@@ -126,7 +131,7 @@ export async function saveSettings(settings: Settings): Promise<void> {
 export function settingsFromChange(changes: Record<string, { newValue?: unknown }>): Settings | null {
   if (!(STORAGE_KEY in changes)) return null;
   try {
-    return validateSettings(changes[STORAGE_KEY].newValue);
+    return validateStoredSettings(changes[STORAGE_KEY].newValue);
   } catch {
     return null;
   }
