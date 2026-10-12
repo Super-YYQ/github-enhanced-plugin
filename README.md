@@ -14,14 +14,9 @@
 
 ## 获取与安装
 
-目前没有 Chrome Web Store 或 Edge Add-ons 的安装链接。使用 Node.js 24（已验证 `24.14.0`）在仓库根目录构建：
+从 [Releases](https://github.com/Super-YYQ/github-enhanced-plugin/releases) 下载对应插件的 ZIP（如 `github-native-markdown-enhance-0.2.0.zip`），解压到一个固定目录。在 Chrome 的 `chrome://extensions` 或 Edge 的 `edge://extensions` 打开开发者模式，选择“加载已解压的扩展程序”，指向解压出的目录（`manifest.json` 所在处）。不需要 Node.js 或任何开发环境。
 
-```powershell
-npm ci
-npm run build
-```
-
-在 Chrome 的 `chrome://extensions` 或 Edge 的 `edge://extensions` 打开开发者模式，选择“加载已解压的扩展程序”，目录选 `plugins/native-markdown-enhance/dist/`。如果此前加载的是旧的仓库根目录 `dist/`，请先在旧扩展选项页**导出设置 JSON**，再移除旧开发版、加载新目录并导入设置；目录变化可能使浏览器分配新的扩展 ID，旧的本地配置不会自动迁移，也要避免两个副本同时注入按钮。插件的功能、设置、适配范围与验证情况见其[独立 README](plugins/native-markdown-enhance/README.md)。
+如果此前通过源码构建加载过旧目录：更换加载目录可能使浏览器分配新的扩展 ID，请先在旧扩展选项页**导出设置 JSON**，再移除旧开发版、加载新目录并导入设置，也要避免两个副本同时注入按钮。插件的功能、设置、适配范围与验证情况见其[独立 README](plugins/native-markdown-enhance/README.md)。
 
 ## 仓库结构
 
@@ -34,10 +29,29 @@ plugins/
     assets/             # 扩展图标
     docs/               # 插件设计、验收与实际界面截图
     dist/               # 构建后生成；不提交
+scripts/                # 打包脚本（package.mjs）
+release/                # 打包输出；不提交
 docs/research/           # 仓库层面的发布调研
 ```
 
 根目录是 npm workspace 入口。`npm run build`、`npm run typecheck` 与 `npm test` 会运行各插件对应的脚本；也可用 `npm run build --workspace github-native-markdown-enhance` 只构建当前插件。新增插件时在 `plugins/` 下建立独立目录与 Manifest，并更新上面的插件索引。
+
+## 发布流程
+
+每个插件通过 git tag 触发自动打包发布，tag 命名为 `<插件目录>-v<manifest 版本>`：
+
+1. 修改 `plugins/<插件目录>/manifest.json` 与其 `package.json` 的 `version`（两处必须一致），提交并合入 `main`，等 CI 通过。
+2. 打 tag 并推送（workflow 必须已存在于 `main`，且 tag 指向包含 `.github/workflows/release.yml` 的 commit，否则不会触发）：
+
+   ```powershell
+   git tag native-markdown-enhance-v0.3.0
+   git push origin native-markdown-enhance-v0.3.0
+   ```
+
+3. GitHub Actions 自动执行：校验 tag 与 manifest / package.json 版本一致 → 类型检查 → 测试 → 构建 → 打包 ZIP → 创建 Release 并附 ZIP（自动生成更新说明）。
+4. 失败时删除远端 tag（`git push origin :refs/tags/<tag>`），修复后重新打 tag 推送；已发布 Release 的 tag 名不要复用于其他 commit。
+
+ZIP 内文件位于压缩包根（`manifest.json` 在顶层），既是用户安装包，将来也可直接用于 Chrome Web Store 上传。
 
 ## 发布与许可证
 

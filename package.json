@@ -7,6 +7,10 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "fixture": "npm run fixture --workspace github-native-markdown-enhance"
+    "fixture": "npm run fixture --workspace github-native-markdown-enhance",
+    "package": "node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "zip-lib": "^1.4.0"
   }
 }

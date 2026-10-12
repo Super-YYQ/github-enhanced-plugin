@@ -4,7 +4,7 @@
 
 为 GitHub 原生 Markdown 编辑器添加一个图标菜单，选择命令后把 Markdown 插入**当前**编辑框。GitHub 自带的 Write / Preview、文件预览、撤销与提交操作保持原样，扩展不替换编辑器。
 
-本插件是 [GitHub Enhanced Plugins](../../README.md) 仓库中的一个独立扩展。当前版本 `0.2.0` 可作为本地加载扩展使用，尚未在浏览器商店发布。
+本插件是 [GitHub Enhanced Plugins](../../README.md) 仓库中的一个独立扩展。当前版本 `0.2.0` 可从仓库的 [Releases](../../releases) 下载 ZIP 使用，尚未在浏览器商店发布。
 
 ## 功能
 
@@ -33,16 +33,9 @@
 
 ![本地 Issue 测试页中的 Alert 二级菜单](docs/images/issue-menu-fixture.png)
 
-## 本地安装
+## 安装
 
-需要 Node.js 24（已验证 `24.14.0`）。在[仓库根目录](../../README.md)执行：
-
-```powershell
-npm ci
-npm run build
-```
-
-构建输出位于 `plugins/native-markdown-enhance/dist/`。打开 Chrome 的 `chrome://extensions` 或 Edge 的 `edge://extensions`，开启开发者模式，选择“加载已解压的扩展程序”，指定该 `dist/` 目录。如果之前加载过仓库根目录的旧 `dist/`，先从旧扩展选项页导出设置 JSON，再移除旧版、加载新目录并导入设置；新路径可能产生不同的扩展 ID，原有本地配置不会自动迁移。修改源码后重新构建并在扩展管理页重新加载。
+从仓库的 [Releases](../../releases) 页下载 `github-native-markdown-enhance-<版本>.zip`，解压到一个固定目录。打开 Chrome 的 `chrome://extensions` 或 Edge 的 `edge://extensions`，开启开发者模式，选择“加载已解压的扩展程序”，指向解压出的目录（`manifest.json` 所在处）。不需要 Node.js 或任何开发环境。如果之前加载过其他来源的开发版目录，先从旧扩展选项页导出设置 JSON，再移除旧版、加载新目录并导入设置；更换目录可能产生不同的扩展 ID，原有本地配置不会自动迁移。
 
 ## 使用与设置
 
@@ -62,14 +55,17 @@ npm run build
 
 ## 开发
 
-在仓库根目录执行：
+修改源码后从源码构建本地验证。需要 Node.js 24（已验证 `24.14.0`），在仓库根目录执行：
 
 ```powershell
+npm ci
 npm run typecheck
 npm test
 npm run build
 npm run fixture
 ```
+
+构建输出位于 `plugins/native-markdown-enhance/dist/`，在扩展管理页以“加载已解压的扩展程序”指向该目录；重新构建后需要在扩展管理页手动重新加载。发布新版本走仓库的 tag 流程，见[仓库 README 的发布流程](../../README.md#发布流程)。
 
 `npm run fixture` 在 `http://127.0.0.1:8765/owner/repo/edit/main/README.md` 提供 CodeMirror 测试页，在 `/owner/repo/issues/new` 提供多输入框测试页。测试页不能代替 GitHub 实页验证。
 

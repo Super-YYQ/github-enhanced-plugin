@@ -1,0 +1,49 @@
+# 自动打包发布：推 <插件目录>-v<manifest 版本> 格式的 tag 触发，例如
+# native-markdown-enhance-v0.2.0。tag 必须指向已包含本文件的 commit。
+# 流程：校验版本一致性 → typecheck / test / build → 打包 ZIP → 创建 Release 并附 ZIP。
+# 发布步骤见仓库根 README 的“发布流程”一节。
+name: Release
+
+on:
+  push:
+    tags:
+      - '*-v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # 打包脚本先跑：解析 tag 并校验 manifest / package.json / tag 三处版本一致，
+      # 不一致立即失败，不做无意义的构建。--print-package 只输出 npm 包名。
+      - name: 解析 tag 并校验版本一致性
+        id: tag
+        run: |
+          npm_package=$(node scripts/package.mjs --tag "${GITHUB_REF_NAME}" --print-package)
+          echo "npm_package=$npm_package" >> "$GITHUB_OUTPUT"
+      - name: 类型检查
+        run: npm run typecheck --workspace "${{ steps.tag.outputs.npm_package }}"
+      - name: 测试
+        run: npm test --workspace "${{ steps.tag.outputs.npm_package }}"
+      - name: 构建
+        run: npm run build --workspace "${{ steps.tag.outputs.npm_package }}"
+      - name: 打包 ZIP
+        run: node scripts/package.mjs --tag "${GITHUB_REF_NAME}" --expect-package "${{ steps.tag.outputs.npm_package }}"
+      - name: 创建 Release 并附 ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          zip_file=$(ls release/*.zip)
+          gh release create "${GITHUB_REF_NAME}" "$zip_file" --generate-notes
